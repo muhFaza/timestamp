@@ -3,58 +3,77 @@ import { StyleSheet, Text, useColorScheme } from "react-native";
 import { Colors } from "react-native/Libraries/NewAppScreen";
 
 const Clock = () => {
-  const [currentTime, setCurrentTime] = useState('')
-  const [currentDate, setCurrentDate] = useState('')
+  const [currentDateTime, setCurrentDateTime] = useState({
+    time: '',
+    date: '',
+  });
 
-  
   const isDarkMode = useColorScheme() === 'dark'
   const textColor = useMemo(() => ({
     color: isDarkMode ? Colors.lighter : Colors.darker,
-  }), [isDarkMode])
+  }), [isDarkMode]);
 
   useEffect(() => {
-    const updateClock = () => {
-      const now = new Date();
+    const formatTime = (now) => {
       const hours = now.getHours();
       const minutes = now.getMinutes();
       const seconds = now.getSeconds();
       const isAm = hours < 12;
-      
-      // Format: Convert 24hr to 12hr format, pad with zeros, show AM/PM
-      const formattedTime = [
-        ((hours + 11) % 12) + 1, // Convert 24hr to 12hr format
-        minutes < 10 ? '0' + minutes : minutes,
-        seconds < 10 ? '0' + seconds : seconds,
-      ].join(':') + (isAm ? ' AM' : ' PM');
 
-      setCurrentTime(formattedTime);
+      return [
+        ((hours + 11) % 12) + 1,
+        minutes.toString().padStart(2, '0'),
+        seconds.toString().padStart(2, '0'),
+      ].join(':') + (isAm ? ' AM' : ' PM');
     };
 
-    const updateDate = () => {
+    const formatDate = (now) => {
+      return now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    };
+
+    // Update Time every second
+    const updateTime = () => {
       const now = new Date();
-      const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-      const date = now.toLocaleDateString('en-US', options);
-      setCurrentDate(date)
-    }
+      setCurrentDateTime(prev => ({
+        time: formatTime(now),
+        date: prev.date
+      }))
+    };
 
-    updateClock(); // Initial call to display time immediately
-    updateDate()
+    // Set initial Date and Time
+    const now = new Date();
+    setCurrentDateTime({
+      time: formatTime(now),
+      date: formatDate(now),
+    });
 
-    const timerId = setInterval(updateClock, 1000); // Update time every second
-    const dateId = setInterval(updateDate, 10000); // Update time every 10 second
+    const timeInterval = setInterval(updateTime, 1000);
+
+    // Update Date at midnight
+    const midnight = new Date();
+    midnight.setHours(24, 0, 0, 0); // Set to next midnight
+    const updateDateAtMidnight = () => setCurrentDateTime(prev => ({
+      time: prev.time,
+      date: formatDate(new Date())
+    }));
+    const tillMidnight = midnight.getTime() - now.getTime();
+    const dateTimeout = setTimeout(() => {
+      updateDateAtMidnight();
+      setInterval(updateDateAtMidnight, 86400000); // Update Date every 24 hours after the first timeout
+    }, tillMidnight);
 
     return () => {
-      clearInterval(timerId); // Cleanup time interval on component unmount
-      clearInterval(dateId); // Cleanup date interval on component unmount
+      clearInterval(timeInterval);
+      clearTimeout(dateTimeout);
     };
   }, []);
 
   return (
-    <React.Fragment>
-      <Text style={[styles.dateText, textColor]}>{currentDate}</Text>
-      <Text style={[styles.timeText, textColor]}>{currentTime}</Text>
-    </React.Fragment>
-  )
+    <>
+      <Text style={[styles.dateText, textColor]}>{currentDateTime.date}</Text>
+      <Text style={[styles.timeText, textColor]}>{currentDateTime.time}</Text>
+    </>
+  );
 }
 
 const styles = StyleSheet.create({
@@ -68,4 +87,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default Clock
+export default Clock;

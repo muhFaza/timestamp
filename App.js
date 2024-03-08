@@ -28,8 +28,6 @@ export default function App() {
     color: isDarkMode ? Colors.lighter : Colors.darker,
   };
 
-  console.log(Colors.darker)
-
   useEffect(() => {
     // This function is now cleaner and more modular
     async function loadCheckIns() {
@@ -95,7 +93,7 @@ export default function App() {
     const minutes = Math.floor(totalSeconds / 60);
     const seconds = Math.floor(totalSeconds % 60);
 
-    const sign = includeSign && ms < 0 ? '-' : '+';
+    const sign = includeSign && ms < 0 ? '-' : '';
     return `${sign}${hours}h ${minutes.toString().padStart(2, '0')}m ${seconds.toString().padStart(2, '0')}s`;
   };
 

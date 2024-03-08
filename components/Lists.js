@@ -9,20 +9,18 @@ const Lists = React.memo(({ storage }) => {
     color: isDarkMode ? Colors.lighter : Colors.darker,
   }), [isDarkMode])
 
-  
-
   const formatDuration = useCallback((milliseconds) => {
     let totalSeconds = Math.abs(milliseconds) / 1000; // Convert to seconds and ensure positive
     const hours = Math.floor(totalSeconds / 3600);
     totalSeconds %= 3600;
     const minutes = Math.floor(totalSeconds / 60);
     const seconds = Math.floor(totalSeconds % 60);
-  
+
     return `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
   }, [])
 
 
-  const renderItem = ({ item }) => (
+  const renderItem = ({ item, index }) => (
     <Spacer vertical={0}>
       <View style={styles.dataMapView}>
         <Spacer vertical={0}>
