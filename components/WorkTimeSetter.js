@@ -14,7 +14,7 @@ const TimeSetter = ({ onSave }) => {
 
   const handleSave = useCallback(() => {
     const totalMs = (parseInt(hours) * 3600 + parseInt(minutes) * 60 + parseInt(seconds)) * 1000;
-    // onSave(totalMs);
+    onSave(totalMs);
   }, [hours, minutes, seconds])
 
   return (

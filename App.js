@@ -41,9 +41,9 @@ export default function App() {
           AsyncStorage.getItem('workTimeSetting'),
         ]);
 
-        let totalDurationMs;
+        let totalDurationMs, dataFromStorage;
         if (dataFromStorageJSON !== null) {
-          const dataFromStorage = JSON.parse(dataFromStorageJSON);
+          dataFromStorage = JSON.parse(dataFromStorageJSON);
           setStorageData(dataFromStorage);
 
           const lastCheckIn = dataFromStorage[dataFromStorage.length - 1];
@@ -59,31 +59,18 @@ export default function App() {
           setTotalDuration(formatTotalDuration(totalDurationMs));
         }
 
-        if (loadWorktime !== null) {
-          setWorkTimeSet(loadWorktime)
-        } else {
-          setWorkTimeSet(32400000)
-        }
+        const settingWorktime = loadWorktime ? loadWorktime : 32400000
+        setWorkTimeSet(settingWorktime)
 
-        const days = storageData.length
-        const totalValidWorkTime = days * workTimeSet
+        const days = dataFromStorage.length
+        const totalValidWorkTime = days * settingWorktime
         const durationMinusWorkTime = totalDurationMs - totalValidWorkTime
+        console.log(days, settingWorktime, totalValidWorkTime, durationMinusWorkTime)
         setTotalReduced(durationMinusWorkTime < 0 ? ` -${formatTotalDuration(durationMinusWorkTime)}` : formatTotalDuration(durationMinusWorkTime))
       } catch (error) {
         console.error('Error loading data:', error);
       }
     };
-
-    const loadWorkTimeSetting = async () => {
-      try {
-        const loadWorktime = await AsyncStorage.getItem('workTimeSetting');
-        if (loadWorktime !== null) {
-          setWorkTimeSet(loadWorktime)
-        }
-      } catch (error) {
-        console.error('Error loading Work Time Setting')
-      }
-    }
 
     loadCheckIns();
   }, []);
@@ -141,7 +128,7 @@ export default function App() {
       setTotalDurationInMs(totalDurationMs)
       setTotalDuration(formatTotalDuration(totalDurationMs))
 
-      
+
       const days = updatedData.length
       const totalValidWorkTime = days * workTimeSet
       const durationMinusWorkTime = totalDurationMs - totalValidWorkTime
@@ -153,6 +140,18 @@ export default function App() {
     setIsCheckIn(!isCheckIn);
     setViewSavedTime(formattedDate);
   }, [isCheckIn, storageData]);
+
+  const onSaveWorkTimeSetter = (ms) => {
+    AsyncStorage.setItem('workTimeSetting', ms.toString())
+    setWorkTimeSet(ms)
+
+    const days = storageData.length
+    const totalValidWorkTime = days * ms
+    const durationMinusWorkTime = totalDurationInMs - totalValidWorkTime
+    setTotalReduced(durationMinusWorkTime < 0 ? ` -${formatTotalDuration(durationMinusWorkTime)}` : formatTotalDuration(durationMinusWorkTime))
+    
+    console.log(days, ms, totalValidWorkTime, durationMinusWorkTime, storageData)
+  }
 
   return (
     <SafeAreaView style={[styles.container, backgroundStyle]}>
@@ -170,7 +169,7 @@ export default function App() {
       <Spacer />
 
       <Text style={[textColor]}>Current WorkTime Set: {formatTotalDuration(workTimeSet)}</Text>
-      <WorkTimeSetter />
+      <WorkTimeSetter onSave={onSaveWorkTimeSetter} />
       <Button
         onPress={() => {
           saveDataToStorage([])
