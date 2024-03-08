@@ -6,10 +6,22 @@ import { Colors } from 'react-native/Libraries/NewAppScreen';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function App() {
+  /*
+  * AsyncStorage: storageData contain json of the user data check in/out
+  * AsyncStorage: workTimeSetting contain number in ms of the user worktime setting
+  *  
+  * viewSavedTime stores the last date string of checkin/checkout
+  * totalDuration stores the all total duration in date string
+  * totalReduced stores the all duration time minus the worktime * data.length
+  * workTimeSet stores the workTime set in number ms !default to 9hr / 32,400,000 ms
+  */
   const [storageData, setStorageData] = useState([])
+  const [isCheckIn, setIsCheckIn] = useState(true)
   const [viewSavedTime, setViewSavedTime] = useState('')
   const [totalDuration, setTotalDuration] = useState('')
-  const [isCheckIn, setIsCheckIn] = useState(true)
+  const [totalDurationInMs, setTotalDurationInMs] = useState(0)
+  const [totalReduced, setTotalReduced] = useState('')
+  const [workTimeSet, setWorkTimeSet] = useState(0)
 
   const isDarkMode = useColorScheme() === 'dark';
   const backgroundStyle = {
@@ -24,7 +36,12 @@ export default function App() {
     // Load saved check-ins from AsyncStorage when component mounts
     const loadCheckIns = async () => {
       try {
-        const dataFromStorageJSON = await AsyncStorage.getItem('storageData');
+        const [dataFromStorageJSON, loadWorktime] = await Promise.all([
+          AsyncStorage.getItem('storageData'),
+          AsyncStorage.getItem('workTimeSetting'),
+        ]);
+
+        let totalDurationMs;
         if (dataFromStorageJSON !== null) {
           const dataFromStorage = JSON.parse(dataFromStorageJSON);
           setStorageData(dataFromStorage);
@@ -36,24 +53,52 @@ export default function App() {
             setViewSavedTime(lastCheckIn.formattedDateOut || lastCheckIn.formattedDateIn);
           }
 
-          setTotalDuration(calculateAllTotalDuration(dataFromStorage))
+          // Calculate total duration and set it
+          totalDurationMs = calculateTotalDuration(dataFromStorage);
+          setTotalDurationInMs(totalDurationMs);
+          setTotalDuration(formatTotalDuration(totalDurationMs));
         }
+
+        if (loadWorktime !== null) {
+          setWorkTimeSet(loadWorktime)
+        } else {
+          setWorkTimeSet(32400000)
+        }
+
+        const days = storageData.length
+        const totalValidWorkTime = days * workTimeSet
+        const durationMinusWorkTime = totalDurationMs - totalValidWorkTime
+        setTotalReduced(durationMinusWorkTime < 0 ? ` -${formatTotalDuration(durationMinusWorkTime)}` : formatTotalDuration(durationMinusWorkTime))
       } catch (error) {
         console.error('Error loading data:', error);
       }
     };
 
+    const loadWorkTimeSetting = async () => {
+      try {
+        const loadWorktime = await AsyncStorage.getItem('workTimeSetting');
+        if (loadWorktime !== null) {
+          setWorkTimeSet(loadWorktime)
+        }
+      } catch (error) {
+        console.error('Error loading Work Time Setting')
+      }
+    }
+
     loadCheckIns();
   }, []);
 
-  const calculateAllTotalDuration = useCallback((dataFromStorage) => {
-    const allTotalDuration = dataFromStorage.reduce((acc, currentItem) => {
+  const calculateTotalDuration = (dataFromStorage) => {
+    const sum = dataFromStorage.reduce((acc, currentItem) => {
       if (typeof currentItem.totalDuration === 'number') {
         return acc + currentItem.totalDuration;
       }
       return acc;
     }, 0);
+    return sum
+  }
 
+  const formatTotalDuration = useCallback((allTotalDuration) => {
     let totalSeconds = Math.abs(allTotalDuration) / 1000; // Convert to seconds and ensure positive
     const hours = Math.floor(totalSeconds / 3600);
     totalSeconds %= 3600;
@@ -80,15 +125,27 @@ export default function App() {
     });
 
     let updatedData;
+    // When check in
     if (isCheckIn) {
       const newId = storageData.length;
       const newData = { id: newId, checkIn: date.getTime(), checkOut: false, formattedDateIn: formattedDate, formattedDateOut: false, totalDuration: false };
       updatedData = [newData, ...storageData];
-    } else {
+    }
+    // When check out 
+    else {
       updatedData = storageData.map((data, index) =>
-        index === 0 ? { ...data, checkOut: date.getTime(), formattedDateOut: formattedDate, totalDuration: data.checkIn - date.getTime() } : data
+        index === 0 ? { ...data, checkOut: date.getTime(), formattedDateOut: formattedDate, totalDuration: date.getTime() - data.checkIn } : data
       );
-      setTotalDuration(calculateAllTotalDuration(updatedData))
+
+      const totalDurationMs = calculateTotalDuration(updatedData)
+      setTotalDurationInMs(totalDurationMs)
+      setTotalDuration(formatTotalDuration(totalDurationMs))
+
+      
+      const days = updatedData.length
+      const totalValidWorkTime = days * workTimeSet
+      const durationMinusWorkTime = totalDurationMs - totalValidWorkTime
+      setTotalReduced(durationMinusWorkTime < 0 ? ` -${formatTotalDuration(durationMinusWorkTime)}` : formatTotalDuration(durationMinusWorkTime))
     }
 
     setStorageData(updatedData);
@@ -106,12 +163,13 @@ export default function App() {
       <View>
         <Text style={textColor}>Last Check {!isCheckIn ? 'In' : 'Out'}: {viewSavedTime ? viewSavedTime : 'no data'}</Text>
         {totalDuration !== '' ? <Text style={textColor}>All Duration: {totalDuration}</Text> : null}
+        {totalDuration !== '' ? <Text style={textColor}>All Duration Reduced by Work Time: {totalReduced}</Text> : null}
       </View>
       <Spacer />
       <Lists storage={storageData} />
       <Spacer />
 
-      <Text style={[textColor]}>Set Work Time:</Text>
+      <Text style={[textColor]}>Current WorkTime Set: {formatTotalDuration(workTimeSet)}</Text>
       <WorkTimeSetter />
       <Button
         onPress={() => {
@@ -120,6 +178,9 @@ export default function App() {
           setIsCheckIn(true)
           setViewSavedTime('')
           setTotalDuration('')
+          setTotalDurationInMs(0)
+          setTotalReduced('')
+          AsyncStorage.multiRemove(['storageData', 'workTimeSetting'])
         }}
         color={'red'}
         title='Reset' />

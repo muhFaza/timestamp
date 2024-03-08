@@ -13,8 +13,8 @@ const TimeSetter = ({ onSave }) => {
   }, [])
 
   const handleSave = useCallback(() => {
-    const totalSeconds = parseInt(hours) * 3600 + parseInt(minutes) * 60 + parseInt(seconds);
-    onSave(totalSeconds);
+    const totalMs = (parseInt(hours) * 3600 + parseInt(minutes) * 60 + parseInt(seconds)) * 1000;
+    // onSave(totalMs);
   }, [hours, minutes, seconds])
 
   return (
