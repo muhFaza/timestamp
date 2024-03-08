@@ -1,8 +1,9 @@
 // Improved imports and removed unnecessary ones
 import { StatusBar } from 'expo-status-bar';
 import React, { useCallback, useEffect, useState } from 'react';
-import { Button, SafeAreaView, StyleSheet, Text, View, useColorScheme } from 'react-native';
+import { Alert, Button, SafeAreaView, StyleSheet, Text, View, useColorScheme } from 'react-native';
 import { Spacer, Lists, Clock, WorkTimeSetter } from './components';
+
 import { Colors } from 'react-native/Libraries/NewAppScreen';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -137,9 +138,9 @@ export default function App() {
     const updatedData = storageData.map((data, index) =>
       index === 0 ? {
         ...data,
-        checkOut: date.getTime(),
-        formattedDateOut: formattedDate,
-        totalDuration: date.getTime() - data.checkIn,
+        checkOut: data.checkOut ? data.checkOut : date.getTime(),
+        formattedDateOut: data.formattedDateOut ? data.formattedDateOut : formattedDate,
+        totalDuration: data.totalDuration ? data.totalDuration : date.getTime() - data.checkIn,
       } : data
     );
 
@@ -166,6 +167,54 @@ export default function App() {
     calculateAndSetTotalReduced(totalDurationInMs, storageData.length, newWorkTime);
   }, [totalDurationInMs, storageData])
 
+  const onDelete = (index) => {
+    const updatedData = storageData.filter((_, i) => i !== index);
+    setStorageData(updatedData);
+    saveDataToStorage(updatedData); // Assuming saveDataToStorage correctly saves to AsyncStorage
+
+    const totalDurationMs = calculateTotalDuration(updatedData);
+    setTotalDurationInMs(totalDurationMs);
+    setTotalDuration(formatTotalDuration(totalDurationMs));
+    calculateAndSetTotalReduced(totalDurationMs, updatedData.length, workTimeSet);
+
+    if (!isCheckIn && index === 0) {
+      setIsCheckIn(true)
+    }
+  };
+  
+
+  const showDeleteConfirmation = (index) => {
+    Alert.alert(
+      "Delete Item",
+      "Are you sure you want to delete this item?",
+      [
+        {
+          text: "Cancel",
+          onPress: () => console.log("Cancel Pressed"),
+          style: "cancel"
+        },
+        { text: "OK", onPress: () => onDelete(index) }
+      ],
+      { cancelable: true }
+    );
+  };
+
+  const showResetConfirmation = () => {
+    Alert.alert(
+      "Reset Data",
+      "Are you sure you want to reset all data? This action cannot be undone.",
+      [
+        {
+          text: "Cancel",
+          onPress: () => console.log("Cancel Pressed"),
+          style: "cancel"
+        },
+        { text: "OK", onPress: resetAppState }
+      ],
+      { cancelable: true }
+    );
+  };  
+
   // Component rendering with simplified JSX structure and styles
   return (
     <SafeAreaView style={[styles.container, backgroundStyle]}>
@@ -179,11 +228,11 @@ export default function App() {
         {totalDuration && <Text style={textStyle}>Reduced Duration by Work Time: {totalReduced}</Text>}
       </View>
       <Spacer />
-      <Lists storage={storageData} />
+      <Lists storage={storageData} onDelete={showDeleteConfirmation} />
       <Spacer />
       <Text style={textStyle}>Current WorkTime Set: {formatTotalDuration(workTimeSet)}</Text>
       <WorkTimeSetter onSave={onSaveWorkTimeSetter} />
-      <Button onPress={resetAppState} color="red" title="Reset" />
+      <Button onPress={showResetConfirmation} color="red" title="Reset" />
       <StatusBar style="auto" />
     </SafeAreaView>
   );

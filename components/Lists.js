@@ -1,9 +1,10 @@
-import { FlatList, StyleSheet, Text, View, useColorScheme } from "react-native";
+import { Button, FlatList, StyleSheet, Text, TouchableOpacity, View, useColorScheme } from "react-native";
 import { Colors } from "react-native/Libraries/NewAppScreen";
+import { MaterialIcons } from '@expo/vector-icons';
 import Spacer from "./Spacer";
 import React, { useCallback, useMemo } from "react";
 
-const Lists = React.memo(({ storage }) => {
+const Lists = React.memo(({ storage, onDelete }) => {
   const isDarkMode = useColorScheme() === 'dark'
   const textColor = useMemo(() => ({
     color: isDarkMode ? Colors.lighter : Colors.darker,
@@ -23,11 +24,18 @@ const Lists = React.memo(({ storage }) => {
   const renderItem = ({ item, index }) => (
     <Spacer vertical={0}>
       <View style={styles.dataMapView}>
-        <Spacer vertical={0}>
-          <Text style={textColor}>Checkin:   {item.formattedDateIn}</Text>
-          <Text style={textColor}>Checkout: {item.formattedDateOut}</Text>
-          <Text style={textColor}>Total: {formatDuration(item.totalDuration)}</Text>
-        </Spacer>
+        <View>
+          <Spacer vertical={0}>
+            <Text style={textColor}>Checkin:   {item.formattedDateIn}</Text>
+            <Text style={textColor}>Checkout: {item.formattedDateOut}</Text>
+            <Text style={textColor}>Total: {formatDuration(item.totalDuration)}</Text>
+          </Spacer>
+        </View>
+        <View style={styles.deleteIcon}>
+          <TouchableOpacity onPress={() => onDelete(index)} >
+            <MaterialIcons name="delete-outline" size={24} color="#ddd" />
+          </TouchableOpacity>
+        </View>
       </View>
     </Spacer>
   );
@@ -51,6 +59,14 @@ const styles = StyleSheet.create({
     backgroundColor: '#2e2e2e', // Dark shade for item background
     padding: 10, // Padding inside each item for content spacing
     marginBottom: 8, // Margin between items
+    flex: 1,
+    width: '100%',
+    flexDirection: 'row'
+  },
+  deleteIcon: {
+    alignItems: 'flex-end',
+    // backgroundColor: 'pink',
+    flex: 1
   }
 });
 
