@@ -262,65 +262,39 @@ export default function App() {
   // front = 1 push to front
   // front = 0 push to back
   const pushNewData = (newData, front = -1) => {
-    let placement;
-    // onDataImported(data);
 
     // if current data is empty
     if (!storageData.length) {
-      saveDataToStorage(newData)
-      setStorageData(newData)
-      setIsCheckIn(!!newData[0].checkOut);
-      setCheckInTime(!!newData[0].checkOut ? null : newData[0].checkIn)
-      setViewSavedTime(newData[0].formattedDateOut || newData[0].formattedDateIn);
-
-      const totalDurationMs = calculateTotalDuration(newData);
-      setTotalDurationInMs(totalDurationMs);
-      setTotalDuration(formatTotalDuration(totalDurationMs));
-      calculateAndSetTotalReduced(totalDurationMs, newData.length, workTimeSet);
+      updateStatesImport(newData)
     }
     // push to front
     else if (front == 1) {
       const compiledData = [...newData, ...storageData]
-      saveDataToStorage(compiledData)
-      setStorageData(compiledData)
-      setIsCheckIn(!!compiledData[0].checkOut);
-      setCheckInTime(!!compiledData[0].checkOut ? null : compiledData[0].checkIn)
-      setViewSavedTime(compiledData[0].formattedDateOut || compiledData[0].formattedDateIn);
-
-      const totalDurationMs = calculateTotalDuration(compiledData);
-      setTotalDurationInMs(totalDurationMs);
-      setTotalDuration(formatTotalDuration(totalDurationMs));
-      calculateAndSetTotalReduced(totalDurationMs, compiledData.length, workTimeSet);
+      updateStatesImport(compiledData)
     }
     // push to back
     else if (front == 0) {
       const compiledData = [...storageData, ...newData]
-      saveDataToStorage(compiledData)
-      setStorageData(compiledData)
-      setIsCheckIn(!!compiledData[0].checkOut);
-      setCheckInTime(!!compiledData[0].checkOut ? null : compiledData[0].checkIn)
-      setViewSavedTime(compiledData[0].formattedDateOut || compiledData[0].formattedDateIn);
-
-      const totalDurationMs = calculateTotalDuration(compiledData);
-      setTotalDurationInMs(totalDurationMs);
-      setTotalDuration(formatTotalDuration(totalDurationMs));
-      calculateAndSetTotalReduced(totalDurationMs, compiledData.length, workTimeSet);
+      updateStatesImport(compiledData)
     }
     // decide based on last current data and newest imported data
     else if (front == -1) {
-      console.log('decide: ', parseInt(storageData[storageData.length - 1].checkIn) > parseInt(newData[0].checkIn))
       let compiledData = parseInt(storageData[storageData.length - 1].checkIn) > parseInt(newData[0].checkIn) ? [...storageData, ...newData] : [...newData, ...storageData]
-      saveDataToStorage(compiledData)
-      setStorageData(compiledData)
-      setIsCheckIn(!!compiledData[0].checkOut);
-      setCheckInTime(!!compiledData[0].checkOut ? null : compiledData[0].checkIn)
-      setViewSavedTime(compiledData[0].formattedDateOut || compiledData[0].formattedDateIn);
-
-      const totalDurationMs = calculateTotalDuration(compiledData);
-      setTotalDurationInMs(totalDurationMs);
-      setTotalDuration(formatTotalDuration(totalDurationMs));
-      calculateAndSetTotalReduced(totalDurationMs, compiledData.length, workTimeSet);
+      updateStatesImport(compiledData)
     }
+  }
+
+  const updateStatesImport = (compiledData) => {
+    saveDataToStorage(compiledData)
+    setStorageData(compiledData)
+    setIsCheckIn(!!compiledData[0].checkOut);
+    setCheckInTime(!!compiledData[0].checkOut ? null : compiledData[0].checkIn)
+    setViewSavedTime(compiledData[0].formattedDateOut || compiledData[0].formattedDateIn);
+
+    const totalDurationMs = calculateTotalDuration(compiledData);
+    setTotalDurationInMs(totalDurationMs);
+    setTotalDuration(formatTotalDuration(totalDurationMs));
+    calculateAndSetTotalReduced(totalDurationMs, compiledData.length, workTimeSet);
   }
 
   const _renderWorkTimer = () => {
