@@ -1,8 +1,8 @@
 // Improved imports and removed unnecessary ones
 import { StatusBar } from 'expo-status-bar';
 import React, { useCallback, useEffect, useState } from 'react';
-import { Alert, Button, SafeAreaView, StyleSheet, Text, View, useColorScheme } from 'react-native';
-import { Spacer, Lists, Clock, WorkTimeSetter } from './components';
+import { Alert, Button, Dimensions, SafeAreaView, StyleSheet, Text, View, useColorScheme } from 'react-native';
+import { Spacer, Lists, Clock, WorkTimeSetter, ExportButton, ImportButton } from './components';
 
 import { Colors } from 'react-native/Libraries/NewAppScreen';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -19,6 +19,10 @@ export default function App() {
   const [totalDurationInMs, setTotalDurationInMs] = useState(0);
   const [totalReduced, setTotalReduced] = useState('');
   const [workTimeSet, setWorkTimeSet] = useState(DEFAULT_WORK_TIME_MS);
+  const [checkInTime, setCheckInTime] = useState(null);
+  const [passedTime, setPassedTime] = useState('');
+  const [timeLeft, setTimeLeft] = useState('');
+
 
   const isDarkMode = useColorScheme() === 'dark';
   // Simplify the use of styles for dark and light modes
@@ -28,6 +32,23 @@ export default function App() {
   const textStyle = {
     color: isDarkMode ? Colors.lighter : Colors.darker,
   };
+
+  useEffect(() => {
+    let intervalId;
+
+    if (checkInTime) {
+      intervalId = setInterval(() => {
+        const now = new Date().getTime();
+        const passedTimeMs = now - checkInTime;
+        const timeLeftMs = workTimeSet - passedTimeMs;
+        setPassedTime(formatTotalDuration(passedTimeMs));
+        setTimeLeft(formatTotalDuration(timeLeftMs, true));
+      }, 1000); // Update every second
+    }
+
+    return () => clearInterval(intervalId); // Cleanup on component unmount or when checkInTime changes
+  }, [checkInTime, workTimeSet]);
+
 
   useEffect(() => {
     // This function is now cleaner and more modular
@@ -69,6 +90,7 @@ export default function App() {
     if (data.length > 0) {
       const lastCheckIn = data[0];
       setIsCheckIn(!!lastCheckIn.checkOut);
+      setCheckInTime(!!lastCheckIn.checkOut ? null : lastCheckIn.checkIn)
       setViewSavedTime(lastCheckIn.formattedDateOut || lastCheckIn.formattedDateIn);
 
       const totalDurationMs = calculateTotalDuration(data);
@@ -105,7 +127,7 @@ export default function App() {
       console.error('Error saving data:', error);
     }
   }, [])
-  
+
   const handleCheckinButton = useCallback(() => {
     // Simplified logic and refactored to improve clarity
     const date = new Date();
@@ -122,6 +144,7 @@ export default function App() {
 
   // TODO: possible id duplication if an item is deleted
   const handleCheckIn = (date, formattedDate) => {
+    setCheckInTime(date.getTime())
     const newCheckIn = {
       // TODO: possible id duplication
       id: storageData.length,
@@ -135,6 +158,7 @@ export default function App() {
   };
 
   const handleCheckOut = (date, formattedDate) => {
+    setCheckInTime(null)
     const updatedData = storageData.map((data, index) =>
       index === 0 ? {
         ...data,
@@ -179,9 +203,10 @@ export default function App() {
 
     if (!isCheckIn && index === 0) {
       setIsCheckIn(true)
+      setCheckInTime(null)
     }
   };
-  
+
 
   const showDeleteConfirmation = (index) => {
     Alert.alert(
@@ -213,7 +238,99 @@ export default function App() {
       ],
       { cancelable: true }
     );
-  };  
+  };
+
+  const importPlacementAlert = (data) => {
+    if (!storageData.length) return pushNewData(data)
+    Alert.alert('Choose Data Placement', 'Should we put the imported data to the front or back of the current data?', [
+      {
+        text: "Front",
+        onPress: () => pushNewData(data, 1),
+      },
+      {
+        text: "Back",
+        onPress: () => pushNewData(data, 0),
+      },
+      {
+        text: "Decide for me",
+        onPress: () => pushNewData(data),
+      }
+    ], { cancelable: true })
+  }
+
+  // front = -1 let algo decide
+  // front = 1 push to front
+  // front = 0 push to back
+  const pushNewData = (newData, front = -1) => {
+    let placement;
+    // onDataImported(data);
+
+    // if current data is empty
+    if (!storageData.length) {
+      saveDataToStorage(newData)
+      setStorageData(newData)
+      setIsCheckIn(!!newData[0].checkOut);
+      setCheckInTime(!!newData[0].checkOut ? null : newData[0].checkIn)
+      setViewSavedTime(newData[0].formattedDateOut || newData[0].formattedDateIn);
+
+      const totalDurationMs = calculateTotalDuration(newData);
+      setTotalDurationInMs(totalDurationMs);
+      setTotalDuration(formatTotalDuration(totalDurationMs));
+      calculateAndSetTotalReduced(totalDurationMs, newData.length, workTimeSet);
+    }
+    // push to front
+    else if (front == 1) {
+      const compiledData = [...newData, ...storageData]
+      saveDataToStorage(compiledData)
+      setStorageData(compiledData)
+      setIsCheckIn(!!compiledData[0].checkOut);
+      setCheckInTime(!!compiledData[0].checkOut ? null : compiledData[0].checkIn)
+      setViewSavedTime(compiledData[0].formattedDateOut || compiledData[0].formattedDateIn);
+
+      const totalDurationMs = calculateTotalDuration(compiledData);
+      setTotalDurationInMs(totalDurationMs);
+      setTotalDuration(formatTotalDuration(totalDurationMs));
+      calculateAndSetTotalReduced(totalDurationMs, compiledData.length, workTimeSet);
+    }
+    // push to back
+    else if (front == 0) {
+      const compiledData = [...storageData, ...newData]
+      saveDataToStorage(compiledData)
+      setStorageData(compiledData)
+      setIsCheckIn(!!compiledData[0].checkOut);
+      setCheckInTime(!!compiledData[0].checkOut ? null : compiledData[0].checkIn)
+      setViewSavedTime(compiledData[0].formattedDateOut || compiledData[0].formattedDateIn);
+
+      const totalDurationMs = calculateTotalDuration(compiledData);
+      setTotalDurationInMs(totalDurationMs);
+      setTotalDuration(formatTotalDuration(totalDurationMs));
+      calculateAndSetTotalReduced(totalDurationMs, compiledData.length, workTimeSet);
+    }
+    // decide based on last current data and newest imported data
+    else if (front == -1) {
+      console.log('decide: ', parseInt(storageData[storageData.length - 1].checkIn) > parseInt(newData[0].checkIn))
+      let compiledData = parseInt(storageData[storageData.length - 1].checkIn) > parseInt(newData[0].checkIn) ? [...storageData, ...newData] : [...newData, ...storageData]
+      saveDataToStorage(compiledData)
+      setStorageData(compiledData)
+      setIsCheckIn(!!compiledData[0].checkOut);
+      setCheckInTime(!!compiledData[0].checkOut ? null : compiledData[0].checkIn)
+      setViewSavedTime(compiledData[0].formattedDateOut || compiledData[0].formattedDateIn);
+
+      const totalDurationMs = calculateTotalDuration(compiledData);
+      setTotalDurationInMs(totalDurationMs);
+      setTotalDuration(formatTotalDuration(totalDurationMs));
+      calculateAndSetTotalReduced(totalDurationMs, compiledData.length, workTimeSet);
+    }
+  }
+
+  const _renderWorkTimer = () => {
+    return (<React.Fragment>
+      <Spacer vertical={10} horizontal={0} />
+      <Text style={textStyle}>Work Time</Text>
+      <Text style={textStyle}>Passed: {passedTime} || Left: {timeLeft}</Text>
+      <Spacer vertical={10} horizontal={0} />
+    </React.Fragment>)
+  }
 
   // Component rendering with simplified JSX structure and styles
   return (
@@ -224,6 +341,7 @@ export default function App() {
       <Spacer />
       <View>
         <Text style={textStyle}>Last Check {!isCheckIn ? 'In' : 'Out'}: {viewSavedTime || 'no data'}</Text>
+        {!isCheckIn && _renderWorkTimer()}
         {totalDuration && <Text style={textStyle}>All Duration: {totalDuration}</Text>}
         {totalDuration && <Text style={textStyle}>Reduced Duration by Work Time: {totalReduced}</Text>}
       </View>
@@ -232,7 +350,13 @@ export default function App() {
       <Spacer />
       <Text style={textStyle}>Current WorkTime Set: {formatTotalDuration(workTimeSet)}</Text>
       <WorkTimeSetter onSave={onSaveWorkTimeSetter} />
-      <Button onPress={showResetConfirmation} color="red" title="Reset" />
+      <View style={styles.row}>
+        <ImportButton onImportAlert={importPlacementAlert} />
+        <Spacer vertical={0} horizontal={10} />
+        <ExportButton data={storageData} />
+        <Spacer vertical={0} horizontal={10} />
+        <Button onPress={showResetConfirmation} color="red" title="Reset" />
+      </View>
       <StatusBar style="auto" />
     </SafeAreaView>
   );
@@ -242,6 +366,7 @@ export default function App() {
     saveDataToStorage([]);
     setStorageData([]);
     setIsCheckIn(true);
+    setCheckInTime(null)
     setViewSavedTime('');
     setTotalDuration('');
     setTotalDurationInMs(0);
@@ -256,4 +381,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  row: {
+    width: Dimensions.get('screen').width,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  }
 });
