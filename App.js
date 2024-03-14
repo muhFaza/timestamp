@@ -3,7 +3,7 @@ import { StatusBar } from 'expo-status-bar';
 import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, Button, Dimensions, SafeAreaView, StyleSheet, Text, View, useColorScheme } from 'react-native';
 import { Spacer, Lists, Clock, WorkTimeSetter, ExportButton, ImportButton } from './components';
-
+import DateTimePickerModal from "react-native-modal-datetime-picker";
 import { Colors } from 'react-native/Libraries/NewAppScreen';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -191,23 +191,8 @@ export default function App() {
     calculateAndSetTotalReduced(totalDurationInMs, storageData.length, newWorkTime);
   }, [totalDurationInMs, storageData])
 
-  const onDelete = (index) => {
-    const updatedData = storageData.filter((_, i) => i !== index);
-    setStorageData(updatedData);
-    saveDataToStorage(updatedData); // Assuming saveDataToStorage correctly saves to AsyncStorage
 
-    const totalDurationMs = calculateTotalDuration(updatedData);
-    setTotalDurationInMs(totalDurationMs);
-    setTotalDuration(formatTotalDuration(totalDurationMs));
-    calculateAndSetTotalReduced(totalDurationMs, updatedData.length, workTimeSet);
-
-    if (!isCheckIn && index === 0) {
-      setIsCheckIn(true)
-      setCheckInTime(null)
-    }
-  };
-
-
+  // ========= DELETE FEATURE =========
   const showDeleteConfirmation = (index) => {
     Alert.alert(
       "Delete Item",
@@ -223,6 +208,23 @@ export default function App() {
       { cancelable: true }
     );
   };
+
+  const onDelete = (index) => {
+    const updatedData = storageData.filter((_, i) => i !== index);
+    setStorageData(updatedData);
+    saveDataToStorage(updatedData); // Assuming saveDataToStorage correctly saves to AsyncStorage
+
+    const totalDurationMs = calculateTotalDuration(updatedData);
+    setTotalDurationInMs(totalDurationMs);
+    setTotalDuration(formatTotalDuration(totalDurationMs));
+    calculateAndSetTotalReduced(totalDurationMs, updatedData.length, workTimeSet);
+
+    if (!isCheckIn && index === 0) {
+      setIsCheckIn(true)
+      setCheckInTime(null)
+    }
+  };
+  // ========= END OF DELETE FEATURE =========
 
   const showResetConfirmation = () => {
     Alert.alert(
@@ -240,6 +242,8 @@ export default function App() {
     );
   };
 
+
+  // ========= IMPORT FEATURE =========
   const importPlacementAlert = (data) => {
     if (!storageData.length) return pushNewData(data)
     Alert.alert('Choose Data Placement', 'Should we put the imported data to the front or back of the current data?', [
@@ -296,6 +300,7 @@ export default function App() {
     setTotalDuration(formatTotalDuration(totalDurationMs));
     calculateAndSetTotalReduced(totalDurationMs, compiledData.length, workTimeSet);
   }
+  // ========= END OF IMPORT FEATURE =========
 
   const _renderWorkTimer = () => {
     return (<React.Fragment>
@@ -306,12 +311,42 @@ export default function App() {
     </React.Fragment>)
   }
 
+  // ========= EDIT FEATURE =========
+
+  const [editFeature, setEditFeature] = useState({
+    datePickerVisible: false,
+    selectedDate: new Date(),
+    editIndex: null,
+    editString: '', //contains either 'checkIn' or 'checkOut'
+  })
+
+  const onEditSave = (date) => {
+    // clone storageData fully without referencing
+    const update = JSON.parse(JSON.stringify(storageData))
+    const itemToEdit = update[editFeature.editIndex]
+
+    itemToEdit[editFeature.editString] = date.getTime()
+    itemToEdit[`formattedDate${editFeature.editString.slice(5)}`] = formatDate(date)
+
+    // Calculate totalDuration if both checkIn and checkOut are present
+    if (itemToEdit.checkIn && itemToEdit.checkOut) {
+      itemToEdit.totalDuration = itemToEdit.checkOut - itemToEdit.checkIn
+    }
+
+    saveDataToStorage(update)
+    updateStateWithLoadedData(update, workTimeSet)
+
+    setEditFeature(prev => ({ ...prev, datePickerVisible: false }))
+  }
+  // ========= END OF EDIT FEATURE =========
+
   // Component rendering with simplified JSX structure and styles
   return (
     <SafeAreaView style={[styles.container, backgroundStyle]}>
       <Clock />
       <Spacer />
       <Button onPress={handleCheckinButton} title={isCheckIn ? 'Check In' : 'Check Out'} />
+      <Spacer />
       <Spacer />
       <View>
         <Text style={textStyle}>Last Check {!isCheckIn ? 'In' : 'Out'}: {viewSavedTime || 'no data'}</Text>
@@ -320,7 +355,7 @@ export default function App() {
         {totalDuration && <Text style={textStyle}>Reduced Duration by Work Time: {totalReduced}</Text>}
       </View>
       <Spacer />
-      <Lists storage={storageData} onDelete={showDeleteConfirmation} />
+      <Lists storage={storageData} onDelete={showDeleteConfirmation} setEditFeature={setEditFeature} />
       <Spacer />
       <Text style={textStyle}>Current WorkTime Set: {formatTotalDuration(workTimeSet)}</Text>
       <WorkTimeSetter onSave={onSaveWorkTimeSetter} />
@@ -331,6 +366,15 @@ export default function App() {
         <Spacer vertical={0} horizontal={10} />
         <Button onPress={showResetConfirmation} color="red" title="Reset" />
       </View>
+      <DateTimePickerModal
+        modal
+        isVisible={editFeature.datePickerVisible}
+        date={editFeature.selectedDate}
+        onConfirm={onEditSave}
+        onCancel={() => setEditFeature({ ...editFeature, datePickerVisible: false })}
+        mode="datetime"
+        confirmText='Save'
+      />
       <StatusBar style="auto" />
     </SafeAreaView>
   );

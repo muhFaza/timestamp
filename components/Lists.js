@@ -1,10 +1,10 @@
-import { Button, FlatList, StyleSheet, Text, TouchableOpacity, View, useColorScheme } from "react-native";
+import { Alert, FlatList, StyleSheet, Text, TouchableOpacity, View, useColorScheme } from "react-native";
 import { Colors } from "react-native/Libraries/NewAppScreen";
-import { MaterialIcons } from '@expo/vector-icons';
+import { MaterialIcons, Feather } from '@expo/vector-icons';
 import Spacer from "./Spacer";
 import React, { useCallback, useMemo } from "react";
 
-const Lists = React.memo(({ storage, onDelete }) => {
+const Lists = React.memo(({ storage, onDelete, setEditFeature }) => {
   const isDarkMode = useColorScheme() === 'dark'
   const textColor = useMemo(() => ({
     color: isDarkMode ? Colors.lighter : Colors.darker,
@@ -20,6 +20,45 @@ const Lists = React.memo(({ storage, onDelete }) => {
     return `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
   }, [])
 
+  const getDateTimeFormat = (checkinout) => {
+    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+    const date = new Date(checkinout);
+    const dayName = days[date.getDay()];
+    const day = date.getDate();
+    const month = months[date.getMonth()];
+    const year = date.getFullYear();
+    const time = date.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: true
+    });
+
+    return `${dayName}, ${day} ${month} ${year}. ${time}`;
+  }
+
+  const onEditPrompt = (data, index) => {
+    const alertText = `Which one do you want to edit?\n\n` +
+      `Check in:\n${getDateTimeFormat(data.checkIn)}` +
+      (data.checkOut ? `\n\nCheck out:\n${getDateTimeFormat(data.checkOut)}` : '');
+
+    const buttons = ['checkIn', 'checkOut']
+      .filter(field => data[field]) // Only include buttons for existing fields
+      .map(field => ({
+        text: `Check ${field.slice(5)}`,
+        onPress: () => setEditFeature({
+          datePickerVisible: true,
+          selectedDate: new Date(data[field]),
+          editIndex: index,
+          editString: field,
+        }),
+      }));
+
+    Alert.alert('Edit', alertText, [{ text: 'Cancel', style: 'cancel' }, ...buttons], { cancelable: true });
+  }
+
 
   const renderItem = ({ item, index }) => (
     <Spacer vertical={0}>
@@ -34,6 +73,9 @@ const Lists = React.memo(({ storage, onDelete }) => {
         <View style={styles.deleteIcon}>
           <TouchableOpacity onPress={() => onDelete(index)} >
             <MaterialIcons name="delete-outline" size={24} color="#ddd" />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => onEditPrompt(item, index)} style={{ marginRight: 1 }} >
+            <Feather name="edit" size={19} color="#ddd" />
           </TouchableOpacity>
         </View>
       </View>
@@ -66,7 +108,9 @@ const styles = StyleSheet.create({
   deleteIcon: {
     alignItems: 'flex-end',
     // backgroundColor: 'pink',
-    flex: 1
+    marginBottom: 4,
+    flex: 1,
+    justifyContent: 'space-between'
   }
 });
 

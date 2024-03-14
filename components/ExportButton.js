@@ -16,7 +16,7 @@ const ExportButton = ({ data }) => {
   }
 
   const exportData = async () => {
-    const fileName = 'checkinData.json';
+    const fileName = `exportTimeStampData-${new Date().toString().split(" ").slice(1,4).join("_")}.json`;
     const fileUri = `${FileSystem.documentDirectory}${fileName}`;
     const jsonData = JSON.stringify(data);
 
