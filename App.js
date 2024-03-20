@@ -7,6 +7,10 @@ import DateTimePickerModal from "react-native-modal-datetime-picker";
 import { Colors } from 'react-native/Libraries/NewAppScreen';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import ActionSheet from 'react-native-actions-sheet';
+import { AntDesign } from '@expo/vector-icons';
+import { TouchableOpacity } from 'react-native-gesture-handler';
+import { Accelerometer } from 'expo-sensors';
+import * as Haptics from 'expo-haptics';
 
 // Use a constants file for fixed values like workTime default setting
 const DEFAULT_WORK_TIME_MS = 9 * 60 * 60 * 1000; // 9 hours in milliseconds
@@ -23,10 +27,10 @@ export default function App() {
   const [checkInTime, setCheckInTime] = useState(null);
   const [passedTime, setPassedTime] = useState('');
   const [timeLeft, setTimeLeft] = useState('');
-  const [appStateVisible, setAppStateVisible] = useState(AppState.current);
-
+  // const [appStateVisible, setAppStateVisible] = useState(appState.current);
+  
   const actionSheetRef = useRef(null);
-  const appState = useRef(AppState.currentState);
+  // const appState = useRef(AppState.currentState);
 
   const isDarkMode = useColorScheme() === 'dark';
   // Simplify the use of styles for dark and light modes
@@ -38,23 +42,23 @@ export default function App() {
   };
 
   // useEffect to show action sheet when user switch back to the app
-  useEffect(() => {
-    const subscription = AppState.addEventListener('change', nextAppState => {
-      if (
-        appState.current.match(/inactive|background/) &&
-        nextAppState === 'active'
-      ) {
-        actionSheetRef.current?.show();
-      }
+  // useEffect(() => {
+  //   const subscription = AppState.addEventListener('change', nextAppState => {
+  //     if (
+  //       appState.current.match(/inactive|background/) &&
+  //       nextAppState === 'active'
+  //     ) {
+  //       actionSheetRef.current?.show();
+  //     }
 
-      appState.current = nextAppState;
-      setAppStateVisible(appState.current);
-    });
+  //     appState.current = nextAppState;
+  //     setAppStateVisible(appState.current);
+  //   });
 
-    return () => {
-      subscription.remove();
-    };
-  }, []);
+  //   return () => {
+  //     subscription.remove();
+  //   };
+  // }, []);
 
   // useEffect for "Work Time" timer
   useEffect(() => {
@@ -366,6 +370,35 @@ export default function App() {
   }
   // ========= END OF EDIT FEATURE =========
 
+  // ========= SHAKE FEATURE =========
+  const [data, setData] = useState({
+    x: 0,
+    y: 0,
+    z: 0,
+  });
+
+  useEffect(() => {
+    Accelerometer.setUpdateInterval(100); // Update every 100ms
+
+    const subscription = Accelerometer.addListener(accelerometerData => {
+      setData(accelerometerData);
+    });
+
+    return () => subscription.remove();
+  }, []);
+
+  useEffect(() => {
+    const { x, y, z } = data;
+    const totalForce = Math.sqrt(x * x + y * y + z * z);
+
+    if (totalForce > 2.5) {
+      // Haptic feedback / Vibration
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      actionSheetRef.current?.show()
+    }
+  }, [data]);
+  // ========= END OF SHAKE FEATURE =========
+
   // Component rendering with simplified JSX structure and styles
   return (
     <SafeAreaView style={[styles.container, backgroundStyle]}>
@@ -401,9 +434,13 @@ export default function App() {
         confirmText='Save'
       />
       <StatusBar style="auto" />
-      <ActionSheet ref={actionSheetRef} containerStyle={styles.actionSheetContainer} defaultOverlayOpacity={0.5}>
+      <ActionSheet ref={actionSheetRef} containerStyle={styles.actionSheetContainer} defaultOverlayOpacity={0.6}>
+        <TouchableOpacity onPress={() => actionSheetRef.current?.hide()} style={{alignSelf: 'flex-end', padding: 14}} >
+          <AntDesign name="close" size={30} color="#ccc" />
+        </TouchableOpacity>
         <View style={styles.actionSheetView}>
           <Text style={[textStyle, styles.sheetText]}>Would you like to {isCheckIn ? 'Check in?' : 'Check out?'}</Text>
+          <Spacer vertical={15} />
           <CheckinButton onPress={handleCheckinButton} isCheckIn={isCheckIn} />
         </View>
       </ActionSheet>
@@ -438,12 +475,17 @@ const styles = StyleSheet.create({
   },
   sheetText: {
     textAlign: 'center',
-    padding: 20,
+    // padding: 20,
+    fontSize: 18,
+    fontWeight: '600'
   },
   actionSheetContainer: { backgroundColor: '#333' },
   actionSheetView: {
-    height: 175,
-    marginTop: 10,
+    // height: 210,
+    paddingVertical: 20,
+    height: 200,
     alignItems: 'center',
+    // justifyContent: 'center',
+    // marginBottom:40
   }
 });
