@@ -1,11 +1,12 @@
 // Improved imports and removed unnecessary ones
 import { StatusBar } from 'expo-status-bar';
-import React, { useCallback, useEffect, useState } from 'react';
-import { Alert, Button, Dimensions, SafeAreaView, StyleSheet, Text, View, useColorScheme } from 'react-native';
-import { Spacer, Lists, Clock, WorkTimeSetter, ExportButton, ImportButton } from './components';
+import React, { useCallback, useEffect, useState, useRef } from 'react';
+import { Alert, AppState, Button, Dimensions, SafeAreaView, StyleSheet, Text, View, useColorScheme } from 'react-native';
+import { Spacer, Lists, Clock, WorkTimeSetter, ExportButton, ImportButton, CheckinButton } from './components';
 import DateTimePickerModal from "react-native-modal-datetime-picker";
 import { Colors } from 'react-native/Libraries/NewAppScreen';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import ActionSheet from 'react-native-actions-sheet';
 
 // Use a constants file for fixed values like workTime default setting
 const DEFAULT_WORK_TIME_MS = 9 * 60 * 60 * 1000; // 9 hours in milliseconds
@@ -22,7 +23,10 @@ export default function App() {
   const [checkInTime, setCheckInTime] = useState(null);
   const [passedTime, setPassedTime] = useState('');
   const [timeLeft, setTimeLeft] = useState('');
+  const [appStateVisible, setAppStateVisible] = useState(AppState.current);
 
+  const actionSheetRef = useRef(null);
+  const appState = useRef(AppState.currentState);
 
   const isDarkMode = useColorScheme() === 'dark';
   // Simplify the use of styles for dark and light modes
@@ -33,6 +37,26 @@ export default function App() {
     color: isDarkMode ? Colors.lighter : Colors.darker,
   };
 
+  // useEffect to show action sheet when user switch back to the app
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', nextAppState => {
+      if (
+        appState.current.match(/inactive|background/) &&
+        nextAppState === 'active'
+      ) {
+        actionSheetRef.current?.show();
+      }
+
+      appState.current = nextAppState;
+      setAppStateVisible(appState.current);
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
+
+  // useEffect for "Work Time" timer
   useEffect(() => {
     let intervalId;
 
@@ -49,9 +73,8 @@ export default function App() {
     return () => clearInterval(intervalId); // Cleanup on component unmount or when checkInTime changes
   }, [checkInTime, workTimeSet]);
 
-
+  // useEffect for first app load
   useEffect(() => {
-    // This function is now cleaner and more modular
     async function loadCheckIns() {
       try {
         const [dataFromStorage, workTimeSetting] = await Promise.all([
@@ -66,6 +89,8 @@ export default function App() {
         updateStateWithLoadedData(parsedData, workTime);
       } catch (error) {
         console.error('Error loading data:', error);
+      } finally {
+        actionSheetRef.current?.show();
       }
     }
 
@@ -140,6 +165,7 @@ export default function App() {
     saveDataToStorage(updatedData);
     setIsCheckIn(!isCheckIn);
     setViewSavedTime(formattedDate);
+    actionSheetRef.current?.hide();
   }, [isCheckIn, storageData, workTimeSet]);
 
   // TODO: possible id duplication if an item is deleted
@@ -345,15 +371,14 @@ export default function App() {
     <SafeAreaView style={[styles.container, backgroundStyle]}>
       <Clock />
       <Spacer />
-      <Button onPress={handleCheckinButton} title={isCheckIn ? 'Check In' : 'Check Out'} />
-      <Spacer />
-      <Spacer />
       <View>
         <Text style={textStyle}>Last Check {!isCheckIn ? 'In' : 'Out'}: {viewSavedTime || 'no data'}</Text>
         {!isCheckIn && _renderWorkTimer()}
         {totalDuration && <Text style={textStyle}>All Duration: {totalDuration}</Text>}
         {totalDuration && <Text style={textStyle}>Reduced Duration by Work Time: {totalReduced}</Text>}
       </View>
+      <Spacer />
+      <CheckinButton onPress={handleCheckinButton} isCheckIn={isCheckIn} />
       <Spacer />
       <Lists storage={storageData} onDelete={showDeleteConfirmation} setEditFeature={setEditFeature} />
       <Spacer />
@@ -376,6 +401,12 @@ export default function App() {
         confirmText='Save'
       />
       <StatusBar style="auto" />
+      <ActionSheet ref={actionSheetRef} containerStyle={styles.actionSheetContainer} defaultOverlayOpacity={0.5}>
+        <View style={styles.actionSheetView}>
+          <Text style={[textStyle, styles.sheetText]}>Would you like to {isCheckIn ? 'Check in?' : 'Check out?'}</Text>
+          <CheckinButton onPress={handleCheckinButton} isCheckIn={isCheckIn} />
+        </View>
+      </ActionSheet>
     </SafeAreaView>
   );
 
@@ -404,5 +435,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  sheetText: {
+    textAlign: 'center',
+    padding: 20,
+  },
+  actionSheetContainer: { backgroundColor: '#333' },
+  actionSheetView: {
+    height: 175,
+    marginTop: 10,
+    alignItems: 'center',
   }
 });

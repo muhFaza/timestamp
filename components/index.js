@@ -4,6 +4,7 @@ import Clock from "./Clock";
 import WorkTimeSetter from "./WorkTimeSetter";
 import ExportButton from "./ExportButton";
 import ImportButton from "./ImportButton";
+import CheckinButton from "./CheckinButton";
 
 export {
   Spacer,
@@ -12,4 +13,5 @@ export {
   WorkTimeSetter,
   ExportButton,
   ImportButton,
+  CheckinButton
 }
